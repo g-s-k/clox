@@ -1,25 +1,19 @@
-BIN_DIR = ./bin
-BUILD_DIR = ./build
-SRC_DIR = ./src
+SRC := ./src
 
-EPHEMERAL = $(BIN_DIR) $(BUILD_DIR)
-
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-BASE = $(notdir $(SRCS:.c=.o))
-OBJS = $(addprefix $(BUILD_DIR)/, $(BASE))
-
+CPPFLAGS = -MMD -MP
 CFLAGS = -Wall
 
-$(BIN_DIR)/clox: $(OBJS) $(BIN_DIR)
-	$(CC) -o $@ $(OBJS)
+vpath %.c $(SRC)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(BUILD_DIR)
-	$(CC) -c $(CFLAGS) -o $@ $<
+SRCS = $(wildcard $(SRC)/*.c)
+OBJS = $(SRCS:.c=.o)
 
-$(EPHEMERAL):
-	mkdir -p $@
+clox: $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+-include $(OBJS:.o=.d)
 
 .PHONY: clean
 
 clean:
-	$(RM) -r $(EPHEMERAL)
+	$(RM) -r clox $(OBJS)
