@@ -589,6 +589,18 @@ static void function(FunctionType type) {
   }
 }
 
+static void classDeclaration() {
+  consume(TOKEN_IDENTIFIER, "Expect class name.");
+  uint8_t nameConstant = identifierConstant(&parser.previous);
+  declareVariable();
+
+  emitBytes(OP_CLASS, nameConstant);
+  defineVariable(nameConstant);
+
+  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+}
+
 static void funDeclaration() {
   uint8_t global = parseVariable("Expect function name.");
   markInitialized();
@@ -597,7 +609,9 @@ static void funDeclaration() {
 }
 
 static void declaration() {
-  if (match(TOKEN_FUN)) {
+  if (match(TOKEN_CLASS)) {
+    classDeclaration();
+  } else if (match(TOKEN_FUN)) {
     funDeclaration();
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
@@ -698,6 +712,30 @@ static void call(bool canAssign) {
   emitBytes(OP_CALL, argCount);
 }
 
+static void key(bool canAssign) {
+  expression();
+  consume(TOKEN_RIGHT_BRACKET, "Expect ']' after key.");
+
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitByte(OP_SET_PROPERTY);
+  } else {
+    emitByte(OP_GET_PROPERTY);
+  }
+}
+
+static void dot(bool canAssign) {
+  consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+  emitBytes(OP_CONSTANT, identifierConstant(&parser.previous));
+
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitByte(OP_SET_PROPERTY);
+  } else {
+    emitByte(OP_GET_PROPERTY);
+  }
+}
+
 static void literal(bool canAssign) {
   switch (parser.previous.type) {
     case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -724,8 +762,10 @@ ParseRule rules[] = {
   { NULL,     NULL,    PREC_NONE },       // TOKEN_RIGHT_PAREN
   { NULL,     NULL,    PREC_NONE },       // TOKEN_LEFT_BRACE
   { NULL,     NULL,    PREC_NONE },       // TOKEN_RIGHT_BRACE
+  { NULL,     key,     PREC_CALL },       // TOKEN_LEFT_BRACKET
+  { NULL,     NULL,    PREC_NONE },       // TOKEN_RIGHT_BRACKET
   { NULL,     NULL,    PREC_NONE },       // TOKEN_COMMA
-  { NULL,     NULL,    PREC_NONE },       // TOKEN_DOT
+  { NULL,     dot,     PREC_CALL },       // TOKEN_DOT
   { unary,    binary,  PREC_TERM },       // TOKEN_MINUS
   { NULL,     binary,  PREC_TERM },       // TOKEN_PLUS
   { NULL,     NULL,    PREC_NONE },       // TOKEN_SEMICOLON
